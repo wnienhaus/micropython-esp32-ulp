@@ -19,7 +19,7 @@ jobs:
         python-version: '3.x'
     - name: Install dependencies
       run: |
-        pip install setuptools
+        pip install setuptools setuptools_scm
     - name: Build package
       env:
         VERSION: ${{ github.event.release.tag_name }}
