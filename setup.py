@@ -1,8 +1,9 @@
+import os
 import re
+import subprocess
+
 import sdist_upip
 from setuptools import setup
-
-VERSION = "1.0.0"
 
 
 def long_desc_from_readme():
@@ -18,9 +19,17 @@ def long_desc_from_readme():
         return long_description
 
 
+def get_version():
+    version = os.environ.get('VERSION', None)
+    if not version:
+        version = subprocess.check_output(['git', 'describe', '--always', '--tags', '--dirty'])
+        version = str(version, 'utf-8').strip()
+    return version
+
+
 setup(
     name="micropython-py-esp32-ulp",
-    version=VERSION,
+    version=get_version(),
     description="Assembler toolchain for the ESP32 ULP co-processor, written in MicroPython",
     long_description=long_desc_from_readme(),
     long_description_content_type='text/x-rst',
