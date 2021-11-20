@@ -6,30 +6,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  #test:  ## dont publish without passing test
   publish:
+
     runs-on: ubuntu-latest
-    #needs: [test]
+
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout
+      uses: actions/checkout@v2
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.9'
-    - uses: actions/cache@v2
-      name: Configure pip caching
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-publish-pip-${{ hashFiles('**/setup.py') }}
-        restore-keys: |
-          ${{ runner.os }}-publish-pip-
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        pip install setuptools
     - name: Build package
       env:
         VERSION: ${{ github.event.release.tag_name }}
       run: |
-        pip install setuptools
         python setup.py sdist
-        rm dist/*.orig  #clean sdist_upip noise
+        rm dist/*.orig  # clean sdist_upip noise
     - name: Publish to Test PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
