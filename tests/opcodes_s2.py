@@ -7,7 +7,7 @@
 
 from uctypes import UINT32, BFUINT32, BF_POS, BF_LEN
 from esp32_ulp.opcodes_s2 import make_ins, make_ins_struct_def
-from esp32_ulp.opcodes_s2 import get_reg, get_imm, get_cond, arg_qualify, eval_arg, ARG, REG, IMM, SYM, COND
+from esp32_ulp.opcodes_s2 import get_reg, get_imm, get_cond, arg_qualify, parse_int, eval_arg, ARG, REG, IMM, SYM, COND
 from esp32_ulp.assemble import SymbolTable, ABS, REL, TEXT
 import esp32_ulp.opcodes_s2 as opcodes
 
@@ -39,6 +39,29 @@ def test_make_ins():
     assert _delay.all == 0x40000023
 
 
+def test_parse_int():
+    # decimal
+    assert parse_int("5") == 5, "5 == 5"
+    assert parse_int("-5") == -5, "-5 == -5"
+    # hex
+    assert parse_int("0x5") == 5, "0x5 == 5"
+    assert parse_int("0x5a") == 90, "0x5a == 90"
+    assert parse_int("-0x5a") == -90, "-0x5a == -90"
+    # binary
+    assert parse_int("0b1001") == 9, "0b1001 == 9"
+    assert parse_int("-0b1001") == -9, "-0b1001 == 9"
+    # octal
+    assert parse_int("0100") == 64, "0100 == 64"
+    assert parse_int("0o210") == 136, "0o210 == 136"
+    assert parse_int("-0100") == -64, "-0100 == -64"
+    assert parse_int("-0o210") == -136, "-0o210 == -136"
+    # negative cases
+    assert_raises(ValueError, parse_int, '0b123', message="invalid syntax for integer with base 2: '123'")
+    assert_raises(ValueError, parse_int, '0900', message="invalid syntax for integer with base 8: '0900'")
+    assert_raises(ValueError, parse_int, '0o900', message="invalid syntax for integer with base 8: '900'")
+    assert_raises(ValueError, parse_int, '0xg', message="invalid syntax for integer with base 16: 'g'")
+
+
 def test_arg_qualify():
     assert arg_qualify('r0') == ARG(REG, 0, 'r0')
     assert arg_qualify('R3') == ARG(REG, 3, 'R3')
@@ -46,6 +69,7 @@ def test_arg_qualify():
     assert arg_qualify('-1') == ARG(IMM, -1, '-1')
     assert arg_qualify('1') == ARG(IMM, 1, '1')
     assert arg_qualify('0x20') == ARG(IMM, 32, '0x20')
+    assert arg_qualify('0100') == ARG(IMM, 64, '0100')
     assert arg_qualify('0o100') == ARG(IMM, 64, '0o100')
     assert arg_qualify('0b1000') == ARG(IMM, 8, '0b1000')
     assert arg_qualify('eq') == ARG(COND, 'eq', 'eq')
@@ -96,6 +120,11 @@ def test_eval_arg():
     assert eval_arg('const >> 1') == 21
     assert eval_arg('(const|4)&0xf') == 0xe
 
+    assert eval_arg('0x7') == 7
+    assert eval_arg('010') == 8
+    assert eval_arg('-0x7') == -7  # negative
+    assert eval_arg('~0x7') == -8  # complement
+
     assert_raises(ValueError, eval_arg, 'evil()')
     assert_raises(ValueError, eval_arg, 'def cafe()')
     assert_raises(ValueError, eval_arg, '1 ^ 2')
@@ -105,14 +134,17 @@ def test_eval_arg():
     opcodes.symbols = None
 
 
-def assert_raises(exception, func, *args):
+def assert_raises(exception, func, *args, message=None):
     try:
         func(*args)
-    except exception:
+    except exception as e:
         raised = True
+        actual_message = e.args[0]
     else:
         raised = False
     assert raised
+    if message:
+        assert actual_message == message, '%s == %s' % (actual_message, message)
 
 
 def test_reg_direct_ulp_addressing():
@@ -258,6 +290,7 @@ def test_reg_address_translations_s3_sens():
 
 test_make_ins_struct_def()
 test_make_ins()
+test_parse_int()
 test_arg_qualify()
 test_get_reg()
 test_get_imm()

@@ -285,11 +285,36 @@ def eval_arg(arg):
             _, _, sym_value = symbols.get_sym(token)
             parts.append(str(sym_value))
         else:
-            parts.append(token)
+            try:
+                # attempt to parse, to convert numbers with base prefix correctly
+                int_token = parse_int(token)
+                parts.append(str(int_token))
+            except ValueError:
+                parts.append(token)
     parts = "".join(parts)
     if not validate_expression(parts):
         raise ValueError('Unsupported expression: %s' % parts)
     return eval(parts)
+
+
+def parse_int(literal):
+    """
+    Parses string literals into integers, using base prefixes
+    0x (hex), 0b (binary), and 0o or legacy 0NNN (octal).
+    Without prefix will be treated as decimal.
+    """
+    if len(literal) > 2:
+        prefix_start = 1 if literal[0] == '-' else 0  # skip negative sign if present
+
+        if literal[prefix_start] == "0":
+            prefix = literal[prefix_start + 1]
+            if prefix == "x":
+                return int(literal, 16)
+            elif prefix == "b":
+                return int(literal, 2)
+            return int(literal, 8)  # legacy octal (e.g. 077)
+
+    return int(literal)  # implicit base10
 
 
 def arg_qualify(arg):
@@ -311,7 +336,7 @@ def arg_qualify(arg):
         if arg_lower in ['--', 'eq', 'ov', 'lt', 'gt', 'ge', 'le']:
             return ARG(COND, arg_lower, arg)
     try:
-        return ARG(IMM, int(arg), arg)
+        return ARG(IMM, parse_int(arg), arg)
     except ValueError:
         pass
     try:
